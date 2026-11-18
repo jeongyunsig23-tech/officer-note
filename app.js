@@ -13,6 +13,7 @@ let state = {
     schedules: [],
     checklists: [],
     vacations: [],
+    soldiers: [],
     dutySteps: [],
     dutyChecklistStatus: {},
 };
@@ -80,19 +81,55 @@ const DEFAULT_SCHEDULES = [
 ];
 
 const DEFAULT_DUTY_STEPS = [
-    { id: 1, text: '총기 및 탄약고 열쇠 수불 & 봉인 상태 확인' },
-    { id: 2, text: '지휘통제실 비밀 및 일일 암구호 수령' },
-    { id: 3, text: '일석점호 인원 결산 (총원/현재원/환자/외진)' },
-    { id: 4, text: '소대별 생활관 온도/환기/청결 및 화재 점검' },
-    { id: 5, text: '외곽 울타리 및 거수자 침투로 순찰 (야간 1차)' },
-    { id: 6, text: '탄약고 및 유류고 이상 유무 점검' },
-    { id: 7, text: '사이버지식정보방 및 취사실 소등/잠금 확인' },
-    { id: 8, text: '불침번 및 초병 교대 근무 상태 점검' },
-    { id: 9, text: '당직사령/지휘관 야간 중간보고 (22:00)' },
-    { id: 10, text: '심야 취약시간대 순찰 (02:00~03:00)' },
-    { id: 11, text: '조식 취사 지원 및 온수 공급 상태 확인' },
-    { id: 12, text: '일조점호 및 아침 도수체조 인원 보고' },
-    { id: 13, text: '총기함 열쇠 인수인계 및 당직일지 서명' }
+    { id: 'step-1', text: '총기 및 탄약고 열쇠 수불 & 봉인 상태 확인' },
+    { id: 'step-2', text: '지휘통제실 비밀 및 일일 암구호 수령' },
+    { id: 'step-3', text: '일석점호 인원 결산 (총원/현재원/환자/외진)' },
+    { id: 'step-4', text: '소대별 생활관 온도/환기/청결 및 화재 점검' },
+    { id: 'step-5', text: '외곽 울타리 및 거수자 침투로 순찰 (야간 1차)' },
+    { id: 'step-6', text: '탄약고 및 유류고 이상 유무 점검' },
+    { id: 'step-7', text: '사이버지식정보방 및 취사실 소등/잠금 확인' },
+    { id: 'step-8', text: '불침번 및 초병 교대 근무 상태 점검' },
+    { id: 'step-9', text: '당직사령/지휘관 야간 중간보고 (22:00)' },
+    { id: 'step-10', text: '심야 취약시간대 순찰 (02:00~03:00)' },
+    { id: 'step-11', text: '조식 취사 지원 및 온수 공급 상태 확인' },
+    { id: 'step-12', text: '일조점호 및 아침 도수체조 인원 보고' },
+    { id: 'step-13', text: '총기함 열쇠 인수인계 및 당직일지 서명' }
+];
+
+const DEFAULT_SOLDIERS = [
+    {
+        id: 'sol-1',
+        name: '김철수',
+        rank: '일병',
+        enlist_date: '2026-03-02',
+        role: '1분대 1소총수',
+        attention: '환절기 비염 증상, 관찰 요망',
+        notes: [
+            { date: '2026-10-15', text: '소대전입 후 성실히 적응 중. 동기들과 사이 원만함.' }
+        ]
+    },
+    {
+        id: 'sol-2',
+        name: '이영희',
+        rank: '이병',
+        enlist_date: '2026-08-10',
+        role: '2분대 유탄수',
+        attention: '신병 전입 관찰 대상 (체력 관리 필요)',
+        notes: [
+            { date: '2026-11-05', text: '사격 훈련 전 긴장 완화 면담 진행. 자신감 북돋아 줌.' }
+        ]
+    },
+    {
+        id: 'sol-3',
+        name: '박민수',
+        rank: '상병',
+        enlist_date: '2025-10-15',
+        role: '1분대장',
+        attention: '체력 특급전사, 포상휴가 2회 추천',
+        notes: [
+            { date: '2026-09-20', text: '분대장 임명 후 후임 지도 우수. 장교 지휘 방침 잘 따름.' }
+        ]
+    }
 ];
 
 const PRESET_GEAR_TEMPLATES = {
@@ -145,6 +182,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderSelectedDateEvents();
     renderDutyChecklist();
     renderDutyScheduleList();
+    renderSoldierTab();
     renderGeneralChecklist();
     renderRecurringList();
     renderVacationTab();
@@ -168,7 +206,6 @@ function initSupabase() {
             badge.className = "flex items-center space-x-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium border bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition";
             badgeText.textContent = "Supabase DB 연결됨";
 
-            // 클라우드 데이터 비동기 동기화
             syncWithSupabase();
         } catch (e) {
             console.error('Supabase 연결 오류:', e);
@@ -177,11 +214,10 @@ function initSupabase() {
     } else {
         state.isSupabaseConnected = false;
         badge.className = "flex items-center space-x-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium border bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20 transition";
-        badgeText.textContent = "로컬 모드 (연동 설정)";
+        badgeText.textContent = "로컬 모드 (설정 클릭)";
     }
 }
 
-// Supabase와 클라우드 데이터 동기화
 async function syncWithSupabase() {
     if (!state.supabase) return;
     try {
@@ -200,7 +236,7 @@ async function syncWithSupabase() {
     }
 }
 
-// 로컬 스토리지 데이터 로드
+// 로컬 스토리지 데이터 로드 & 저장
 function loadLocalData() {
     const savedSchedules = localStorage.getItem('officer_schedules');
     if (savedSchedules) {
@@ -208,6 +244,27 @@ function loadLocalData() {
     } else {
         state.schedules = [...DEFAULT_SCHEDULES];
         saveLocalSchedules();
+    }
+
+    const savedDutySteps = localStorage.getItem('officer_duty_steps');
+    if (savedDutySteps) {
+        state.dutySteps = JSON.parse(savedDutySteps);
+    } else {
+        state.dutySteps = JSON.parse(JSON.stringify(DEFAULT_DUTY_STEPS));
+        saveLocalDutySteps();
+    }
+
+    const savedDutyStatus = localStorage.getItem('officer_duty_status');
+    if (savedDutyStatus) {
+        state.dutyChecklistStatus = JSON.parse(savedDutyStatus);
+    }
+
+    const savedSoldiers = localStorage.getItem('officer_soldiers');
+    if (savedSoldiers) {
+        state.soldiers = JSON.parse(savedSoldiers);
+    } else {
+        state.soldiers = JSON.parse(JSON.stringify(DEFAULT_SOLDIERS));
+        saveLocalSoldiers();
     }
 
     const savedChecklists = localStorage.getItem('officer_checklists');
@@ -220,19 +277,6 @@ function loadLocalData() {
             is_completed: false
         }));
         saveLocalChecklists();
-    }
-
-    const savedDutyStatus = localStorage.getItem('officer_duty_status');
-    if (savedDutyStatus) {
-        state.dutyChecklistStatus = JSON.parse(savedDutyStatus);
-    }
-
-    const savedDutySteps = localStorage.getItem('officer_duty_steps');
-    if (savedDutySteps) {
-        state.dutySteps = JSON.parse(savedDutySteps);
-    } else {
-        state.dutySteps = JSON.parse(JSON.stringify(DEFAULT_DUTY_STEPS));
-        saveLocalDutySteps();
     }
 
     const savedVacations = localStorage.getItem('officer_vacations');
@@ -258,16 +302,20 @@ function saveLocalSchedules() {
     localStorage.setItem('officer_schedules', JSON.stringify(state.schedules));
 }
 
+function saveLocalDutySteps() {
+    localStorage.setItem('officer_duty_steps', JSON.stringify(state.dutySteps));
+}
+
+function saveLocalSoldiers() {
+    localStorage.setItem('officer_soldiers', JSON.stringify(state.soldiers));
+}
+
 function saveLocalChecklists() {
     localStorage.setItem('officer_checklists', JSON.stringify(state.checklists));
 }
 
 function saveLocalVacations() {
     localStorage.setItem('officer_vacations', JSON.stringify(state.vacations));
-}
-
-function saveLocalDutySteps() {
-    localStorage.setItem('officer_duty_steps', JSON.stringify(state.dutySteps));
 }
 
 function setupDefaultDates() {
@@ -299,7 +347,7 @@ function setupDefaultDates() {
 // 5. 탭 전환 제어
 function switchTab(tabId) {
     state.activeTab = tabId;
-    const tabSections = ['calendar', 'duty', 'checklist', 'recurring', 'vacation', 'guide'];
+    const tabSections = ['calendar', 'duty', 'soldiers', 'checklist', 'recurring', 'vacation', 'guide'];
 
     tabSections.forEach(id => {
         const sec = document.getElementById(`tab-${id}`);
@@ -315,6 +363,7 @@ function switchTab(tabId) {
         }
     });
 
+    if (tabId === 'soldiers') renderSoldierTab();
     lucide.createIcons();
 }
 
@@ -336,7 +385,6 @@ function renderCalendar() {
     if (!grid) return;
     grid.innerHTML = '';
 
-    // 이전 달 빈 칸
     for (let x = firstDayIndex; x > 0; x--) {
         const dayDiv = document.createElement('div');
         dayDiv.className = "min-h-[70px] sm:min-h-[85px] p-1.5 rounded-xl bg-slate-900/30 border border-slate-800/40 opacity-30 select-none text-slate-500 text-xs";
@@ -344,7 +392,6 @@ function renderCalendar() {
         grid.appendChild(dayDiv);
     }
 
-    // 이번 달 날짜들
     for (let day = 1; day <= lastDay; day++) {
         const monthStr = String(month + 1).padStart(2, '0');
         const dayStr = String(day).padStart(2, '0');
@@ -353,7 +400,6 @@ function renderCalendar() {
         const isToday = (dateStr === '2026-11-18');
         const isSelected = (dateStr === state.selectedDate);
 
-        // 해당 일자의 일정 검색
         const dayEvents = state.schedules.filter(s => {
             return s.start_date <= dateStr && s.end_date >= dateStr;
         });
@@ -365,10 +411,8 @@ function renderCalendar() {
         dayDiv.className = `min-h-[70px] sm:min-h-[85px] p-1.5 rounded-xl border flex flex-col justify-between cursor-pointer transition ${borderClass}`;
         dayDiv.onclick = () => selectDate(dateStr);
 
-        // 상단 날짜 숫자
         let dayNumBadge = `<span class="text-xs font-semibold ${isToday ? 'px-1.5 py-0.5 rounded bg-amber-500 text-slate-950 font-bold' : 'text-slate-300'}">${day}</span>`;
 
-        // 일정 뱃지들 (최대 2개 노출, 초과시 +N)
         let eventBadgesHtml = '<div class="space-y-1 mt-1 overflow-hidden">';
         dayEvents.slice(0, 2).forEach(ev => {
             let badgeBg = 'bg-slate-700 text-slate-200';
@@ -425,7 +469,7 @@ function selectDate(dateStr) {
     renderSelectedDateEvents();
 }
 
-// 7. 선택된 날짜 상세 일정 렌더링
+// 7. 선택 날짜 일정 렌더링
 function renderSelectedDateEvents() {
     const title = document.getElementById('selectedDateTitle');
     const subtitle = document.getElementById('selectedDateSubtitle');
@@ -459,24 +503,19 @@ function renderSelectedDateEvents() {
     dayEvents.forEach(ev => {
         let badgeColor = 'border-slate-700 bg-slate-800/80';
         let badgeText = '부대일과';
-        let textColor = 'text-slate-300';
 
         if (ev.category === 'duty') {
             badgeColor = 'border-amber-500/40 bg-amber-500/10 text-amber-400';
             badgeText = ev.duty_type || '당직근무';
-            textColor = 'text-amber-300';
         } else if (ev.title.includes('비번')) {
             badgeColor = 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400';
             badgeText = '당직비번';
-            textColor = 'text-emerald-300';
         } else if (ev.category === 'training') {
             badgeColor = 'border-rose-500/40 bg-rose-500/10 text-rose-400';
             badgeText = '훈련/교육';
-            textColor = 'text-rose-300';
         } else if (ev.category === 'vacation') {
             badgeColor = 'border-blue-500/40 bg-blue-500/10 text-blue-400';
             badgeText = '휴가';
-            textColor = 'text-blue-300';
         }
 
         html += `
@@ -534,7 +573,6 @@ async function handleCreateSchedule(e) {
 
     state.schedules.push(newSchedule);
 
-    // [핵심 기능] 당직 선택 시 다음 날 '비번' 일정 자동 생성
     if (category === 'duty' && autoOffDuty) {
         const nextDate = new Date(startDate);
         nextDate.setDate(nextDate.getDate() + 1);
@@ -553,7 +591,6 @@ async function handleCreateSchedule(e) {
         state.schedules.push(offDutySchedule);
     }
 
-    // 훈련 준비물 프리셋 자동 추가
     if (presetGear && presetGear !== 'none' && PRESET_GEAR_TEMPLATES[presetGear]) {
         PRESET_GEAR_TEMPLATES[presetGear].forEach(item => {
             state.checklists.push({
@@ -566,7 +603,6 @@ async function handleCreateSchedule(e) {
         renderGeneralChecklist();
     }
 
-    // Supabase 연동 시 클라우드 저장
     if (state.isSupabaseConnected && state.supabase) {
         try {
             await state.supabase.from('schedules').insert([
@@ -615,7 +651,7 @@ async function deleteSchedule(id) {
     updateWidgets();
 }
 
-// 9. 당직사관 실무 HUB 로직 (체크리스트 추가/삭제 지원)
+// 9. 당직사관 실무 HUB 로직 (체크리스트 추가/삭제/복원)
 function renderDutyChecklist() {
     const container = document.getElementById('dutyChecklistContainer');
     if (!container) return;
@@ -769,7 +805,270 @@ function copyReportText() {
     });
 }
 
-// 11. 준비물 및 훈련 체크리스트
+// ==============================================================================
+// 11. ⭐ 소대원 병력 관리 & 상담 노트 로직 (NEW!)
+// ==============================================================================
+
+// 육군 복무 18개월(548일) 기준 전역 D-Day 및 복무율 계산
+function calculateDischargeInfo(enlistDateStr) {
+    const enlist = new Date(enlistDateStr);
+    const discharge = new Date(enlist);
+    discharge.setMonth(discharge.getMonth() + 18);
+    discharge.setDate(discharge.getDate() - 1); // 18개월 - 1일
+
+    const dischargeStr = discharge.toISOString().split('T')[0];
+    const today = new Date('2026-11-18');
+
+    const totalDays = Math.ceil((discharge - enlist) / (1000 * 60 * 60 * 24));
+    const servedDays = Math.ceil((today - enlist) / (1000 * 60 * 60 * 24));
+    const remainingDays = Math.ceil((discharge - today) / (1000 * 60 * 60 * 24));
+
+    let percent = Math.round((servedDays / totalDays) * 100);
+    if (percent < 0) percent = 0;
+    if (percent > 100) percent = 100;
+
+    return {
+        dischargeStr,
+        remainingDays,
+        percent,
+        isDischarged: remainingDays <= 0
+    };
+}
+
+function renderSoldierTab() {
+    const container = document.getElementById('soldierGridContainer');
+    const totalCountElem = document.getElementById('soldierTotalCount');
+    const attentionCountElem = document.getElementById('soldierAttentionCount');
+    const dischargeSoonElem = document.getElementById('soldierDischargeSoonCount');
+    const badgeCount = document.getElementById('soldierBadgeCount');
+
+    if (!container) return;
+
+    if (totalCountElem) totalCountElem.textContent = `${state.soldiers.length}명`;
+    if (badgeCount) badgeCount.textContent = state.soldiers.length;
+
+    let attentionCount = 0;
+    let dischargeSoonCount = 0;
+
+    state.soldiers.forEach(sol => {
+        if (sol.attention && sol.attention.trim() !== '') attentionCount++;
+        const info = calculateDischargeInfo(sol.enlist_date);
+        if (info.remainingDays > 0 && info.remainingDays <= 60) dischargeSoonCount++;
+    });
+
+    if (attentionCountElem) attentionCountElem.textContent = `${attentionCount}명`;
+    if (dischargeSoonElem) dischargeSoonElem.textContent = `${dischargeSoonCount}명`;
+
+    if (state.soldiers.length === 0) {
+        container.innerHTML = `
+            <div class="col-span-full p-8 text-center text-slate-500 text-xs border border-dashed border-slate-800 rounded-2xl space-y-2">
+                <i data-lucide="users" class="w-10 h-10 mx-auto text-slate-600"></i>
+                <p>등록된 소대원이 없습니다.</p>
+                <button onclick="openSoldierModal()" class="text-emerald-400 hover:underline font-semibold">+ 첫 소대원 등록하기</button>
+            </div>
+        `;
+        lucide.createIcons();
+        return;
+    }
+
+    let html = '';
+    state.soldiers.forEach(sol => {
+        const info = calculateDischargeInfo(sol.enlist_date);
+
+        let rankBg = 'bg-slate-700 text-slate-200 border-slate-600';
+        if (sol.rank === '이병') rankBg = 'bg-slate-700 text-slate-200 border-slate-600';
+        else if (sol.rank === '일병') rankBg = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40';
+        else if (sol.rank === '상병') rankBg = 'bg-blue-500/20 text-blue-400 border-blue-500/40';
+        else if (sol.rank === '병장') rankBg = 'bg-amber-500/20 text-amber-400 border-amber-500/40';
+
+        const lastNote = sol.notes && sol.notes.length > 0 ? sol.notes[sol.notes.length - 1] : null;
+
+        html += `
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3.5 hover:border-slate-700 transition">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] px-2 py-0.5 rounded font-bold border ${rankBg}">${sol.rank}</span>
+                            <h4 class="font-bold text-sm text-white">${escapeHtml(sol.name)}</h4>
+                            <span class="text-xs text-slate-400 font-medium">${escapeHtml(sol.role || '소총수')}</span>
+                        </div>
+                        <p class="text-[11px] text-slate-500 mt-1">입대: ${sol.enlist_date} ➔ 전역: ${info.dischargeStr}</p>
+                    </div>
+                    <span class="text-xs font-bold px-2 py-1 rounded-lg ${info.isDischarged ? 'bg-slate-800 text-slate-400' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'}">
+                        ${info.isDischarged ? '전역완료' : `D-${info.remainingDays}`}
+                    </span>
+                </div>
+
+                <!-- 복무율 프로그레스 바 -->
+                <div class="space-y-1">
+                    <div class="flex justify-between text-[11px] text-slate-400">
+                        <span>복무 진척도</span>
+                        <span class="font-bold text-white">${info.percent}%</span>
+                    </div>
+                    <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                        <div class="bg-emerald-500 h-full rounded-full transition-all" style="width: ${info.percent}%"></div>
+                    </div>
+                </div>
+
+                <!-- 특이사항 태그 -->
+                ${sol.attention ? `
+                    <div class="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300 flex items-center gap-1.5">
+                        <i data-lucide="alert-triangle" class="w-3.5 h-3.5 shrink-0 text-amber-400"></i>
+                        <span class="truncate">${escapeHtml(sol.attention)}</span>
+                    </div>
+                ` : ''}
+
+                <!-- 최근 면담 메모 프리뷰 -->
+                <div class="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80 text-[11px] space-y-1">
+                    <div class="flex items-center justify-between text-slate-400">
+                        <span class="font-semibold flex items-center gap-1"><i data-lucide="message-square" class="w-3 h-3 text-emerald-400"></i> 최근 면담 메모</span>
+                        <span>${lastNote ? lastNote.date : '기록 없음'}</span>
+                    </div>
+                    <p class="text-slate-300 italic truncate">${lastNote ? escapeHtml(lastNote.text) : '면담 기록이 없습니다.'}</p>
+                </div>
+
+                <!-- 버튼 액션 -->
+                <div class="pt-1 flex items-center justify-between border-t border-slate-800">
+                    <button onclick="openCounselModal('${sol.id}')" class="text-xs px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 rounded-lg font-medium transition flex items-center gap-1">
+                        <i data-lucide="edit-3" class="w-3 h-3"></i>
+                        <span>면담 기록</span>
+                    </button>
+                    <button onclick="deleteSoldier('${sol.id}')" class="text-xs text-slate-500 hover:text-rose-400 p-1.5 transition" title="소대원 삭제">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+    lucide.createIcons();
+}
+
+function openSoldierModal() {
+    document.getElementById('soldierModal').classList.remove('hidden');
+    lucide.createIcons();
+}
+
+function closeSoldierModal() {
+    document.getElementById('soldierModal').classList.add('hidden');
+}
+
+function handleCreateSoldier(e) {
+    e.preventDefault();
+
+    const name = document.getElementById('soldierName').value.trim();
+    const rank = document.getElementById('soldierRank').value;
+    const enlistDate = document.getElementById('soldierEnlistDate').value;
+    const role = document.getElementById('soldierRole').value.trim();
+    const attention = document.getElementById('soldierAttention').value.trim();
+    const noteText = document.getElementById('soldierInitialNote').value.trim();
+
+    if (!name || !enlistDate) {
+        alert('이름과 입대일을 모두 입력해주세요.');
+        return;
+    }
+
+    const newSoldier = {
+        id: 'sol-' + Date.now(),
+        name,
+        rank,
+        enlist_date: enlistDate,
+        role: role || '소총수',
+        attention: attention || null,
+        notes: noteText ? [{ date: '2026-11-18', text: noteText }] : []
+    };
+
+    state.soldiers.unshift(newSoldier);
+    saveLocalSoldiers();
+    closeSoldierModal();
+    renderSoldierTab();
+
+    document.getElementById('soldierForm').reset();
+    alert(`${rank} ${name} 소대원이 성공적으로 등록되었습니다!`);
+}
+
+function deleteSoldier(id) {
+    if (!confirm('이 소대원 정보를 삭제하시겠습니까?')) return;
+    state.soldiers = state.soldiers.filter(s => s.id !== id);
+    saveLocalSoldiers();
+    renderSoldierTab();
+}
+
+function openCounselModal(soldierId) {
+    const sol = state.soldiers.find(s => s.id === soldierId);
+    if (!sol) return;
+
+    document.getElementById('counselSoldierId').value = sol.id;
+    document.getElementById('counselSoldierName').value = `${sol.rank} ${sol.name} (${sol.role || '소총수'})`;
+    document.getElementById('counselText').value = '';
+    document.getElementById('counselModal').classList.remove('hidden');
+    lucide.createIcons();
+}
+
+function closeCounselModal() {
+    document.getElementById('counselModal').classList.add('hidden');
+}
+
+function handleSaveCounselNote(e) {
+    e.preventDefault();
+
+    const soldierId = document.getElementById('counselSoldierId').value;
+    const date = document.getElementById('counselDate').value;
+    const text = document.getElementById('counselText').value.trim();
+
+    const sol = state.soldiers.find(s => s.id === soldierId);
+    if (sol && text) {
+        if (!sol.notes) sol.notes = [];
+        sol.notes.push({ date, text });
+        saveLocalSoldiers();
+        closeCounselModal();
+        renderSoldierTab();
+        alert('면담 일지가 기록되었습니다.');
+    }
+}
+
+// ==============================================================================
+// 12. ⭐ 엑셀(CSV) 내보내기 & 인쇄 최적화 (NEW!)
+// ==============================================================================
+function exportSchedulesToCSV() {
+    if (!state.schedules || state.schedules.length === 0) {
+        alert('내보낼 일정이 없습니다.');
+        return;
+    }
+
+    let csvContent = '\uFEFF'; // Excel 한글 깨짐 방지 UTF-8 BOM
+    csvContent += '구분,일정명,시작일,종료일,장소,당직구분\n';
+
+    state.schedules.forEach(ev => {
+        let catText = '부대일과';
+        if (ev.category === 'duty') catText = '당직/근무';
+        else if (ev.title.includes('비번')) catText = '당직비번';
+        else if (ev.category === 'training') catText = '훈련/교육';
+        else if (ev.category === 'vacation') catText = '휴가';
+
+        const row = [
+            `"${catText}"`,
+            `"${(ev.title || '').replace(/"/g, '""')}"`,
+            `"${ev.start_date || ''}"`,
+            `"${ev.end_date || ''}"`,
+            `"${(ev.location || '').replace(/"/g, '""')}"`,
+            `"${ev.duty_type || ''}"`
+        ];
+        csvContent += row.join(',') + '\n';
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `오피서노트_군생활일정_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// 13. 준비물 및 훈련 체크리스트
 function renderGeneralChecklist() {
     const container = document.getElementById('generalChecklistContainer');
     if (!container) return;
@@ -780,7 +1079,7 @@ function renderGeneralChecklist() {
     }
 
     let html = '';
-    state.checklists.forEach((item, idx) => {
+    state.checklists.forEach((item) => {
         html += `
             <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-800/50 border border-slate-700/60 hover:bg-slate-800 transition">
                 <label class="flex items-center gap-2 cursor-pointer flex-1 truncate select-none">
@@ -851,7 +1150,7 @@ function applyPresetTemplate(type) {
     alert(`[${type.toUpperCase()}] 세트 준비물 ${items.length}개가 추가되었습니다.`);
 }
 
-// 12. 반복 일정 자동 생성 엔진 (Recurring Engine)
+// 14. 반복 일정 자동 생성 엔진
 function handleCreateRecurring(e) {
     e.preventDefault();
 
@@ -870,7 +1169,6 @@ function handleCreateRecurring(e) {
     let createdCount = 0;
     let curr = new Date(startDate);
 
-    // 날짜 루프 돌며 해당 요일 매칭 시 생성
     while (curr <= endDate) {
         if (curr.getDay() === dayOfWeek) {
             const dateStr = curr.toISOString().split('T')[0];
@@ -886,7 +1184,6 @@ function handleCreateRecurring(e) {
             });
             createdCount++;
 
-            // 격주일 경우 2주 점프
             if (recType === 'biweekly') {
                 curr.setDate(curr.getDate() + 7);
             }
@@ -935,7 +1232,7 @@ function renderRecurringList() {
     lucide.createIcons();
 }
 
-// 13. 휴가 및 D-Day 플래너
+// 15. 휴가 및 D-Day 플래너
 function renderVacationTab() {
     let usedAnnual = 0;
     let usedReward = 0;
@@ -959,7 +1256,6 @@ function renderVacationTab() {
     if (widgetVac) widgetVac.textContent = `${remainingAnnual}일`;
     if (elemBar) elemBar.style.width = `${Math.min(100, (usedAnnual / 21) * 100)}%`;
 
-    // 다음 휴가 D-Day 계산 (2026-11-18 기준)
     const upcoming = state.vacations
         .filter(v => v.start_date >= '2026-11-18')
         .sort((a, b) => a.start_date.localeCompare(b.start_date))[0];
@@ -977,7 +1273,6 @@ function renderVacationTab() {
         nextName.textContent = '예정 없음';
     }
 
-    // 휴가 목록 렌더링
     const container = document.getElementById('vacationListContainer');
     const listCount = document.getElementById('vacationListCount');
     if (!container) return;
@@ -998,7 +1293,7 @@ function renderVacationTab() {
                         <span class="text-[10px] px-2 py-0.5 rounded font-bold bg-blue-500/20 text-blue-400">
                             ${v.vacation_type} (${v.days_used}일)
                         </span>
-                        <h4 class="font-bold text-xs text-white">${v.destination || '행선지 미정'}</h4>
+                        <h4 class="font-bold text-xs text-white">${escapeHtml(v.destination || '행선지 미정')}</h4>
                     </div>
                     <p class="text-[11px] text-slate-400 mt-1">${v.start_date} ~ ${v.end_date} (상태: ${v.status || '승인'})</p>
                 </div>
@@ -1034,7 +1329,6 @@ function handleCreateVacation(e) {
     state.vacations.push(newVac);
     saveLocalVacations();
 
-    // 캘린더에도 휴가 일정으로 동시 등록
     state.schedules.push({
         id: 'sched-vac-' + Date.now(),
         title: `[휴가] ${type} (${dest || '출타'})`,
@@ -1073,7 +1367,7 @@ function closeVacationModal() {
     document.getElementById('vacationModal').classList.add('hidden');
 }
 
-// 14. 위젯 카운터 갱신
+// 16. 위젯 카운터 갱신
 function updateWidgets() {
     const dutyCountElem = document.getElementById('widgetDutyCount');
     const trainCountElem = document.getElementById('widgetTrainingCount');
@@ -1094,7 +1388,7 @@ function updateWidgets() {
     }
 }
 
-// 15. 모달 및 유틸리티 함수
+// 17. 모달 및 유틸리티
 function openScheduleModal() {
     document.getElementById('schedStartDate').value = state.selectedDate;
     document.getElementById('schedEndDate').value = state.selectedDate;
@@ -1133,7 +1427,6 @@ function toggleDutyOption(isDuty) {
     }
 }
 
-// Supabase 설정 모달
 function openConfigModal() {
     document.getElementById('cfgSupabaseUrl').value = localStorage.getItem('officer_supabase_url') || '';
     document.getElementById('cfgSupabaseKey').value = localStorage.getItem('officer_supabase_key') || '';
@@ -1174,4 +1467,3 @@ function escapeHtml(str) {
     if (!str) return '';
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
-
