@@ -13,6 +13,7 @@ let state = {
     schedules: [],
     checklists: [],
     vacations: [],
+    dutySteps: [],
     dutyChecklistStatus: {},
 };
 
@@ -226,6 +227,14 @@ function loadLocalData() {
         state.dutyChecklistStatus = JSON.parse(savedDutyStatus);
     }
 
+    const savedDutySteps = localStorage.getItem('officer_duty_steps');
+    if (savedDutySteps) {
+        state.dutySteps = JSON.parse(savedDutySteps);
+    } else {
+        state.dutySteps = JSON.parse(JSON.stringify(DEFAULT_DUTY_STEPS));
+        saveLocalDutySteps();
+    }
+
     const savedVacations = localStorage.getItem('officer_vacations');
     if (savedVacations) {
         state.vacations = JSON.parse(savedVacations);
@@ -255,6 +264,10 @@ function saveLocalChecklists() {
 
 function saveLocalVacations() {
     localStorage.setItem('officer_vacations', JSON.stringify(state.vacations));
+}
+
+function saveLocalDutySteps() {
+    localStorage.setItem('officer_duty_steps', JSON.stringify(state.dutySteps));
 }
 
 function setupDefaultDates() {
@@ -602,24 +615,40 @@ async function deleteSchedule(id) {
     updateWidgets();
 }
 
-// 9. 당직사관 실무 HUB 로직
+// 9. 당직사관 실무 HUB 로직 (체크리스트 추가/삭제 지원)
 function renderDutyChecklist() {
     const container = document.getElementById('dutyChecklistContainer');
     if (!container) return;
 
+    if (!state.dutySteps || state.dutySteps.length === 0) {
+        container.innerHTML = `
+            <div class="p-6 text-center text-slate-500 text-xs border border-dashed border-slate-800 rounded-xl space-y-1">
+                <p>등록된 당직 체크리스트 항목이 없습니다.</p>
+                <button onclick="resetDutyChecklist()" class="text-amber-400 hover:underline font-semibold">+ 기본 13개 항목 불러오기</button>
+            </div>
+        `;
+        return;
+    }
+
     let html = '';
-    DEFAULT_DUTY_STEPS.forEach(step => {
+    state.dutySteps.forEach((step, idx) => {
         const isChecked = !!state.dutyChecklistStatus[step.id];
         html += `
-            <label class="flex items-center gap-3 p-2.5 rounded-xl bg-slate-800/40 hover:bg-slate-800 border border-slate-800 cursor-pointer transition select-none">
-                <input type="checkbox" onchange="toggleDutyCheck(${step.id})" ${isChecked ? 'checked' : ''} class="w-4 h-4 rounded text-amber-500 focus:ring-0 bg-slate-700 border-slate-600">
-                <span class="${isChecked ? 'line-through text-slate-500' : 'text-slate-200'} font-medium">
-                    <strong class="text-amber-400 mr-1">${step.id}.</strong> ${step.text}
-                </span>
-            </label>
+            <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-800/40 hover:bg-slate-800 border border-slate-800 transition group">
+                <label class="flex items-center gap-3 cursor-pointer select-none flex-1 truncate pr-2">
+                    <input type="checkbox" onchange="toggleDutyCheck('${step.id}')" ${isChecked ? 'checked' : ''} class="w-4 h-4 rounded text-amber-500 focus:ring-0 bg-slate-700 border-slate-600 shrink-0">
+                    <span class="${isChecked ? 'line-through text-slate-500' : 'text-slate-200'} font-medium truncate">
+                        <strong class="text-amber-400 mr-1">${idx + 1}.</strong> ${escapeHtml(step.text)}
+                    </span>
+                </label>
+                <button onclick="removeDutyStepItem('${step.id}')" class="opacity-0 group-hover:opacity-100 p-1 text-slate-500 hover:text-rose-400 transition shrink-0" title="항목 삭제">
+                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                </button>
+            </div>
         `;
     });
     container.innerHTML = html;
+    lucide.createIcons();
 }
 
 function toggleDutyCheck(id) {
@@ -628,10 +657,36 @@ function toggleDutyCheck(id) {
     renderDutyChecklist();
 }
 
+function addDutyStepItem() {
+    const input = document.getElementById('newDutyStepInput');
+    const text = input ? input.value.trim() : '';
+    if (!text) return;
+
+    if (!state.dutySteps) state.dutySteps = [];
+    state.dutySteps.push({
+        id: 'step-' + Date.now(),
+        text: text
+    });
+
+    saveLocalDutySteps();
+    input.value = '';
+    renderDutyChecklist();
+}
+
+function removeDutyStepItem(id) {
+    state.dutySteps = state.dutySteps.filter(s => String(s.id) !== String(id));
+    delete state.dutyChecklistStatus[id];
+    localStorage.setItem('officer_duty_status', JSON.stringify(state.dutyChecklistStatus));
+    saveLocalDutySteps();
+    renderDutyChecklist();
+}
+
 function resetDutyChecklist() {
-    if (!confirm('당직사관 체크리스트를 처음부터 다시 점검하시겠습니까?')) return;
+    if (!confirm('당직사관 체크리스트를 기본 13개 필수 점검 항목으로 복원하시겠습니까?')) return;
+    state.dutySteps = JSON.parse(JSON.stringify(DEFAULT_DUTY_STEPS));
     state.dutyChecklistStatus = {};
     localStorage.removeItem('officer_duty_status');
+    saveLocalDutySteps();
     renderDutyChecklist();
 }
 

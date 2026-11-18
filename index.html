@@ -276,17 +276,28 @@
 
             <!-- 2분할: 좌측 당직사관 필수 점검 체크리스트, 우측 등록된 당직 로스터 -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <!-- 당직사관 15단계 체크리스트 -->
+                <!-- 당직사관 맞춤형 체크리스트 (항목 추가/삭제 가능) -->
                 <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
                     <div class="flex items-center justify-between border-b border-slate-800 pb-3">
                         <div class="flex items-center gap-2">
                             <i data-lucide="list-checks" class="w-5 h-5 text-amber-400"></i>
                             <h3 class="font-bold text-white text-base">당직사관 근무 교대 및 순찰 체크리스트</h3>
                         </div>
-                        <button onclick="resetDutyChecklist()" class="text-xs text-slate-400 hover:text-slate-200">초기화</button>
+                        <button onclick="resetDutyChecklist()" class="text-xs text-amber-400/80 hover:text-amber-300 transition" title="기본 항목으로 복원">
+                            기본값 복원
+                        </button>
                     </div>
 
-                    <div id="dutyChecklistContainer" class="space-y-2 text-xs">
+                    <!-- 새 당직 점검 항목 직접 추가 인풋 -->
+                    <div class="flex items-center gap-2">
+                        <input id="newDutyStepInput" type="text" placeholder="새 당직 점검 항목 직접 입력 (예: 취사실 잔반 확인)..." class="bg-slate-800 border border-slate-700 text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-amber-500 text-white flex-1" onkeydown="if(event.key==='Enter') addDutyStepItem()">
+                        <button onclick="addDutyStepItem()" class="px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-xs shrink-0 flex items-center gap-1 shadow-lg shadow-amber-950 transition">
+                            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                            <span>추가</span>
+                        </button>
+                    </div>
+
+                    <div id="dutyChecklistContainer" class="space-y-2 text-xs max-h-[440px] overflow-y-auto pr-1">
                         <!-- JS 렌더링 -->
                     </div>
                 </div>
