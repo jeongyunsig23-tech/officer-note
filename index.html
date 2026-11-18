@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="ko" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>오피서노트 (OfficerNote) - 초임 장교 군 생활 통합 일정 관리 솔루션</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        military: {
+                            50: '#f4f6f0',
+                            100: '#e5eae0',
+                            200: '#ced8c3',
+                            300: '#afc0a0',
+                            400: '#8ea57a',
+                            500: '#6f8b57',
+                            600: '#566e43',
+                            700: '#435635',
+                            800: '#38462d',
+                            900: '#2f3b27',
+                            950: '#192014',
+                        },
+                        brand: {
+                            dark: '#0f172a',
+                            card: '#1e293b',
+                            border: '#334155',
+                            accent: '#10b981',
+                            duty: '#f59e0b',
+                            training: '#ef4444',
+                            vacation: '#3b82f6',
+                            routine: '#8b5cf6'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Supabase JS CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        /* 커스텀 스크롤바 */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        .tab-active { border-color: #10b981; color: #10b981; font-weight: 700; }
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(0.8);
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-emerald-500 selection:text-white">
+
+    <!-- 상단 헤더 바 -->
+    <header class="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 py-3">
+        <div class="max-w-6xl mx-auto flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-lg bg-emerald-600/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold">
+                    <i data-lucide="shield-check" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <h1 class="font-bold text-lg tracking-tight text-white flex items-center gap-1.5">
+                            오피서노트 <span class="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-semibold border border-emerald-500/30">소위 임관용</span>
+                        </h1>
+                    </div>
+                    <p class="text-xs text-slate-400 hidden sm:block">초임 장교 맞춤형 당직·훈련·휴가·준비물 통합 캘린더</p>
+                </div>
+            </div>
+
+            <!-- 우측 상태 및 액션 -->
+            <div class="flex items-center space-x-2">
+                <!-- Supabase 상태 뱃지 -->
+                <button onclick="openConfigModal()" id="supabaseStatusBadge" class="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium border bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20 transition">
+                    <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                    <span id="supabaseStatusText">로컬 모드 (설정 클릭)</span>
+                </button>
+
+                <!-- 빠른 일정 추가 버튼 -->
+                <button onclick="openScheduleModal()" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-950 transition active:scale-95">
+                    <i data-lucide="plus" class="w-4 h-4"></i>
+                    <span class="hidden sm:inline">새 일정</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 탭 네비게이션 바 -->
+    <nav class="bg-slate-900 border-b border-slate-800 sticky top-[57px] z-30">
+        <div class="max-w-6xl mx-auto px-2 flex overflow-x-auto space-x-1 scrollbar-none py-1">
+            <button onclick="switchTab('calendar')" id="tabBtn-calendar" class="tab-btn flex items-center gap-2 px-3.5 py-2.5 text-xs sm:text-sm font-medium border-b-2 border-emerald-500 text-emerald-400 whitespace-nowrap transition">
+                <i data-lucide="calendar" class="w-4 h-4"></i>
+                <span>통합 캘린더</span>
+            </button>
+            <button onclick="switchTab('duty')" id="tabBtn-duty" class="tab-btn flex items-center gap-2 px-3.5 py-2.5 text-xs sm:text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 whitespace-nowrap transition">
+                <i data-lucide="shield-alert" class="w-4 h-4 text-amber-400"></i>
+                <span>당직사관 실무</span>
+                <span id="dutyBadgeCount" class="text-[10px] px-1.5 py-0.2 bg-amber-500/20 text-amber-300 rounded-full font-bold">0</span>
+            </button>
+            <button onclick="switchTab('checklist')" id="tabBtn-checklist" class="tab-btn flex items-center gap-2 px-3.5 py-2.5 text-xs sm:text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 whitespace-nowrap transition">
+                <i data-lucide="check-square" class="w-4 h-4 text-rose-400"></i>
+                <span>훈련 및 준비물</span>
+            </button>
+            <button onclick="switchTab('recurring')" id="tabBtn-recurring" class="tab-btn flex items-center gap-2 px-3.5 py-2.5 text-xs sm:text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 whitespace-nowrap transition">
+                <i data-lucide="repeat" class="w-4 h-4 text-purple-400"></i>
+                <span>반복 일정 엔진</span>
+            </button>
+            <button onclick="switchTab('vacation')" id="tabBtn-vacation" class="tab-btn flex items-center gap-2 px-3.5 py-2.5 text-xs sm:text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 whitespace-nowrap transition">
+                <i data-lucide="plane-takeoff" class="w-4 h-4 text-blue-400"></i>
+                <span>휴가·D-Day</span>
+            </button>
+            <button onclick="switchTab('guide')" id="tabBtn-guide" class="tab-btn flex items-center gap-2 px-3.5 py-2.5 text-xs sm:text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200 whitespace-nowrap transition">
+                <i data-lucide="help-circle" class="w-4 h-4 text-cyan-400"></i>
+                <span>과제 제출 가이드</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- 메인 컨텐츠 영역 -->
+    <main class="flex-1 max-w-6xl w-full mx-auto p-3 sm:p-6 space-y-6">
+
+        <!-- ======================= TAB 1: 통합 캘린더 ======================= -->
+        <section id="tab-calendar" class="space-y-6">
+            <!-- 소위 전용 대시보드 위젯 요약 바 -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div class="bg-slate-900/80 border border-slate-800 p-3.5 rounded-xl flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-slate-400">이번 달 당직</p>
+                        <h3 id="widgetDutyCount" class="text-xl font-bold text-amber-400 mt-0.5">0회</h3>
+                    </div>
+                    <div class="p-2.5 rounded-lg bg-amber-500/10 text-amber-400">
+                        <i data-lucide="moon" class="w-5 h-5"></i>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900/80 border border-slate-800 p-3.5 rounded-xl flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-slate-400">훈련/교육</p>
+                        <h3 id="widgetTrainingCount" class="text-xl font-bold text-rose-400 mt-0.5">0건</h3>
+                    </div>
+                    <div class="p-2.5 rounded-lg bg-rose-500/10 text-rose-400">
+                        <i data-lucide="target" class="w-5 h-5"></i>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900/80 border border-slate-800 p-3.5 rounded-xl flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-slate-400">남은 연가</p>
+                        <h3 id="widgetVacationDays" class="text-xl font-bold text-blue-400 mt-0.5">21일</h3>
+                    </div>
+                    <div class="p-2.5 rounded-lg bg-blue-500/10 text-blue-400">
+                        <i data-lucide="palmtree" class="w-5 h-5"></i>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900/80 border border-slate-800 p-3.5 rounded-xl flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-slate-400">다음 당직 비번</p>
+                        <h3 id="widgetNextOffDuty" class="text-xs sm:text-sm font-semibold text-emerald-400 mt-1 truncate">없음</h3>
+                    </div>
+                    <div class="p-2.5 rounded-lg bg-emerald-500/10 text-emerald-400">
+                        <i data-lucide="battery-charging" class="w-5 h-5"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 캘린더 메인 레이아웃 (좌: 달력, 우: 선택 날짜 일정 & 오늘 할 일) -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- 좌측 달력 (2컬럼) -->
+                <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl">
+                    <!-- 달력 상단 네비게이션 -->
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center space-x-2">
+                            <h2 id="calendarTitle" class="text-lg sm:text-xl font-bold text-white tracking-tight">2026년 11월</h2>
+                            <button onclick="goToToday()" class="text-xs px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition">오늘</button>
+                        </div>
+                        <div class="flex items-center space-x-1">
+                            <button onclick="prevMonth()" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition">
+                                <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                            </button>
+                            <button onclick="nextMonth()" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition">
+                                <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 요일 헤더 -->
+                    <div class="grid grid-cols-7 gap-1 text-center text-xs font-semibold text-slate-400 mb-2">
+                        <span class="text-rose-400">일</span>
+                        <span>월</span>
+                        <span>화</span>
+                        <span>수</span>
+                        <span>목</span>
+                        <span>금</span>
+                        <span class="text-blue-400">토</span>
+                    </div>
+
+                    <!-- 달력 그리드 -->
+                    <div id="calendarGrid" class="grid grid-cols-7 gap-1 sm:gap-2">
+                        <!-- 동적으로 일자 렌더링 -->
+                    </div>
+
+                    <!-- 카테고리 범례 -->
+                    <div class="mt-4 pt-3 border-t border-slate-800 flex flex-wrap items-center gap-3 text-xs text-slate-400">
+                        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> 당직/근무</span>
+                        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> 비번</span>
+                        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span> 훈련/사격</span>
+                        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span> 부대일과/체육</span>
+                        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span> 휴가</span>
+                    </div>
+                </div>
+
+                <!-- 우측 사이드: 선택된 날짜의 일정 목록 -->
+                <div class="space-y-4">
+                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl">
+                        <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+                            <div>
+                                <h3 id="selectedDateTitle" class="font-bold text-white text-base">선택한 날짜 일정</h3>
+                                <p id="selectedDateSubtitle" class="text-xs text-slate-400 mt-0.5">일정을 확인하거나 추가하세요</p>
+                            </div>
+                            <button onclick="openScheduleModalWithDate()" class="text-xs px-2.5 py-1.5 bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 rounded-lg hover:bg-emerald-600/30 font-medium transition flex items-center gap-1">
+                                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                                <span>추가</span>
+                            </button>
+                        </div>
+
+                        <!-- 선택 날짜 일정 리스트 컨테이너 -->
+                        <div id="selectedDateEventsList" class="mt-4 space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
+                            <!-- JS로 동적 렌더링 -->
+                        </div>
+                    </div>
+
+                    <!-- 당직 비번 팁 카드 (초임 장교 맞춤) -->
+                    <div class="bg-emerald-950/30 border border-emerald-800/40 rounded-xl p-4">
+                        <div class="flex items-start gap-3">
+                            <div class="p-2 bg-emerald-600/20 text-emerald-400 rounded-lg shrink-0">
+                                <i data-lucide="sparkles" class="w-4 h-4"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-xs font-bold text-emerald-300">소위 꿀팁: 비번 자동 생성</h4>
+                                <p class="text-[11px] text-slate-300 mt-1 leading-relaxed">
+                                    새 일정에서 <strong>[당직/근무]</strong>를 선택하고 <strong>'당직 익일 비번 자동 등록'</strong>을 체크하면 다음 날 휴식 일정이 자동으로 캘린더에 연동됩니다.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ======================= TAB 2: 당직사관 실무 HUB ======================= -->
+        <section id="tab-duty" class="space-y-6 hidden">
+            <div class="bg-gradient-to-r from-amber-950/40 via-slate-900 to-slate-900 border border-amber-800/40 rounded-2xl p-5">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="px-2 py-0.5 text-xs font-bold rounded bg-amber-500/20 text-amber-400 border border-amber-500/40">당직사관 완장 착용</span>
+                            <h2 class="text-xl font-bold text-white">당직사관 원스톱 실무 지원</h2>
+                        </div>
+                        <p class="text-xs text-slate-300 mt-1">소위 임관 후 가장 떨리는 첫 당직사관 근무! 인원 보고서와 순찰 점검표를 한 번에 끝냅니다.</p>
+                    </div>
+                    <button onclick="openDutyReportModal()" class="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-amber-950 transition">
+                        <i data-lucide="clipboard-copy" class="w-4 h-4"></i>
+                        <span>점호 인원보고 양식 복사</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 2분할: 좌측 당직사관 필수 점검 체크리스트, 우측 등록된 당직 로스터 -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- 당직사관 15단계 체크리스트 -->
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="list-checks" class="w-5 h-5 text-amber-400"></i>
+                            <h3 class="font-bold text-white text-base">당직사관 근무 교대 및 순찰 체크리스트</h3>
+                        </div>
+                        <button onclick="resetDutyChecklist()" class="text-xs text-slate-400 hover:text-slate-200">초기화</button>
+                    </div>
+
+                    <div id="dutyChecklistContainer" class="space-y-2 text-xs">
+                        <!-- JS 렌더링 -->
+                    </div>
+                </div>
+
+                <!-- 등록된 당직 일정 목록 -->
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="calendar-clock" class="w-5 h-5 text-amber-400"></i>
+                            <h3 class="font-bold text-white text-base">내 당직 근무표 & 비번 현황</h3>
+                        </div>
+                        <button onclick="openScheduleModalCategory('duty')" class="text-xs px-2.5 py-1 bg-amber-600/20 text-amber-400 border border-amber-500/30 rounded-lg hover:bg-amber-600/30 font-medium transition">
+                            + 당직 추가
+                        </button>
+                    </div>
+
+                    <div id="dutyScheduleList" class="space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
+                        <!-- JS 렌더링 -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ======================= TAB 3: 훈련 및 준비물 체크리스트 ======================= -->
+        <section id="tab-checklist" class="space-y-6 hidden">
+            <div class="bg-gradient-to-r from-rose-950/40 via-slate-900 to-slate-900 border border-rose-800/40 rounded-2xl p-5">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="px-2 py-0.5 text-xs font-bold rounded bg-rose-500/20 text-rose-400 border border-rose-500/40">훈련 군장 결속</span>
+                            <h2 class="text-xl font-bold text-white">일정별 준비물 & 군장 체크리스트</h2>
+                        </div>
+                        <p class="text-xs text-slate-300 mt-1">단독군장, 완전군장, 사격훈련, 행군 등 템플릿을 선택하여 준비물을 누락 없이 점검하세요.</p>
+                    </div>
+                    <button onclick="openScheduleModalCategory('training')" class="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-rose-950 transition">
+                        <i data-lucide="plus" class="w-4 h-4"></i>
+                        <span>새 훈련 일정 추가</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 프리셋 템플릿 원클릭 로더 -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5">
+                <h3 class="text-xs font-bold text-slate-300 mb-3 flex items-center gap-2">
+                    <i data-lucide="layers" class="w-4 h-4 text-emerald-400"></i>
+                    <span>훈련 종류별 추천 준비물 세트 (클릭 시 즉시 체크리스트 생성)</span>
+                </h3>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    <button onclick="applyPresetTemplate('single')" class="p-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 text-left transition group">
+                        <div class="text-emerald-400 font-bold text-xs flex items-center justify-between">
+                            <span>단독군장 세트</span>
+                            <i data-lucide="arrow-right" class="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition"></i>
+                        </div>
+                        <p class="text-[11px] text-slate-400 mt-1">방탄모, 요대, 방독면, 대검, 수통, 무전기</p>
+                    </button>
+
+                    <button onclick="applyPresetTemplate('full')" class="p-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 text-left transition group">
+                        <div class="text-rose-400 font-bold text-xs flex items-center justify-between">
+                            <span>완전군장 세트</span>
+                            <i data-lucide="arrow-right" class="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition"></i>
+                        </div>
+                        <p class="text-[11px] text-slate-400 mt-1">배낭, 모포, 침낭, 야전삽, 반합, 전투식량</p>
+                    </button>
+
+                    <button onclick="applyPresetTemplate('shooting')" class="p-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 text-left transition group">
+                        <div class="text-amber-400 font-bold text-xs flex items-center justify-between">
+                            <span>사격훈련 세트</span>
+                            <i data-lucide="arrow-right" class="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition"></i>
+                        </div>
+                        <p class="text-[11px] text-slate-400 mt-1">귀마개, 방청유, 탄피받이, 표적지, 깃발</p>
+                    </button>
+
+                    <button onclick="applyPresetTemplate('officer')" class="p-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 text-left transition group">
+                        <div class="text-blue-400 font-bold text-xs flex items-center justify-between">
+                            <span>지휘/통제용 세트</span>
+                            <i data-lucide="arrow-right" class="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition"></i>
+                        </div>
+                        <p class="text-[11px] text-slate-400 mt-1">작전수첩, 지휘봉, 호루라기, 나침반, 지도</p>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 현재 체크리스트 목록 & 새 아이템 추가 -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+                    <div>
+                        <h3 class="font-bold text-white text-base">준비물 체크리스트 현황</h3>
+                        <p class="text-xs text-slate-400">준비 완료된 물품을 클릭하여 체크하세요</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <input id="newChecklistItemInput" type="text" placeholder="새 준비물 직접 입력..." class="bg-slate-800 border border-slate-700 text-xs px-3 py-2 rounded-lg focus:outline-none focus:border-emerald-500 text-white w-48">
+                        <button onclick="addCustomChecklistItem()" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold shrink-0">
+                            추가
+                        </button>
+                        <button onclick="clearCompletedChecklist()" class="px-2.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-lg text-xs shrink-0" title="완료 항목 삭제">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="generalChecklistContainer" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-[460px] overflow-y-auto pr-1">
+                    <!-- JS 렌더링 -->
+                </div>
+            </div>
+        </section>
+
+        <!-- ======================= TAB 4: 반복 일정 자동 등록 엔진 ======================= -->
+        <section id="tab-recurring" class="space-y-6 hidden">
+            <div class="bg-gradient-to-r from-purple-950/40 via-slate-900 to-slate-900 border border-purple-800/40 rounded-2xl p-5">
+                <div class="flex items-center gap-2">
+                    <span class="px-2 py-0.5 text-xs font-bold rounded bg-purple-500/20 text-purple-400 border border-purple-500/40">스마트 스케줄러</span>
+                    <h2 class="text-xl font-bold text-white">반복 일정 자동 등록 엔진</h2>
+                </div>
+                <p class="text-xs text-slate-300 mt-1">매주 수요일 전투체육, 금요일 총기수입, 주기적 당직 등 반복되는 부대 일정을 한 번에 수십 개 자동 생성합니다.</p>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- 좌측: 반복 일정 일괄 생성 폼 -->
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+                    <h3 class="font-bold text-white text-base border-b border-slate-800 pb-2 flex items-center gap-2">
+                        <i data-lucide="plus-circle" class="w-4 h-4 text-purple-400"></i>
+                        <span>반복 규칙 설정 & 일괄 등록</span>
+                    </h3>
+
+                    <form id="recurringForm" onsubmit="handleCreateRecurring(event)" class="space-y-3.5 text-xs">
+                        <div>
+                            <label class="block text-slate-400 mb-1">일정명</label>
+                            <input id="recTitle" type="text" required placeholder="예: [정기] 전투체육 및 정신전력교육" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-slate-400 mb-1">카테고리</label>
+                            <select id="recCategory" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500">
+                                <option value="routine">부대일과 (체육/점검 등)</option>
+                                <option value="duty">당직/근무 로테이션</option>
+                                <option value="training">정기 훈련/교육</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-slate-400 mb-1">반복 주기</label>
+                            <select id="recType" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500">
+                                <option value="weekly">매주 1회 (지정 요일)</option>
+                                <option value="biweekly">격주 (2주마다)</option>
+                                <option value="monthly">매월 1회</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-slate-400 mb-1">반복 요일</label>
+                            <select id="recDayOfWeek" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-purple-500">
+                                <option value="3">수요일 (전투체육)</option>
+                                <option value="5">금요일 (정기총기점검)</option>
+                                <option value="1">월요일 (주간회의)</option>
+                                <option value="2">화요일</option>
+                                <option value="4">목요일</option>
+                                <option value="6">토요일</option>
+                                <option value="0">일요일</option>
+                            </select>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-slate-400 mb-1">시작일</label>
+                                <input id="recStartDate" type="date" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-purple-500">
+                            </div>
+                            <div>
+                                <label class="block text-slate-400 mb-1">종료일 (최대 3달)</label>
+                                <input id="recEndDate" type="date" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-purple-500">
+                            </div>
+                        </div>
+
+                        <button type="submit" class="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg shadow-purple-950 transition active:scale-95 flex items-center justify-center gap-1.5">
+                            <i data-lucide="sparkles" class="w-4 h-4"></i>
+                            <span>반복 일정 일괄 생성하기</span>
+                        </button>
+                    </form>
+                </div>
+
+                <!-- 우측: 생성된 반복 일정 그룹 관리 -->
+                <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="layers" class="w-5 h-5 text-purple-400"></i>
+                            <h3 class="font-bold text-white text-base">등록된 정기 및 반복 일정 목록</h3>
+                        </div>
+                        <span id="recurringCountBadge" class="text-xs px-2 py-0.5 rounded bg-purple-500/20 text-purple-400 font-semibold">총 0건</span>
+                    </div>
+
+                    <div id="recurringListContainer" class="space-y-2.5 max-h-[480px] overflow-y-auto pr-1">
+                        <!-- JS 렌더링 -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ======================= TAB 5: 휴가 & D-Day 플래너 ======================= -->
+        <section id="tab-vacation" class="space-y-6 hidden">
+            <div class="bg-gradient-to-r from-blue-950/40 via-slate-900 to-slate-900 border border-blue-800/40 rounded-2xl p-5">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="px-2 py-0.5 text-xs font-bold rounded bg-blue-500/20 text-blue-400 border border-blue-500/40">장교 복무 플래너</span>
+                            <h2 class="text-xl font-bold text-white">개인 휴가 계획 & D-Day 계산기</h2>
+                        </div>
+                        <p class="text-xs text-slate-300 mt-1">연가 21일 및 포상/위로 휴가를 체계적으로 계산하고, 다음 휴가 D-Day를 확인하세요.</p>
+                    </div>
+                    <button onclick="openVacationModal()" class="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-blue-950 transition">
+                        <i data-lucide="plus" class="w-4 h-4"></i>
+                        <span>휴가 계획 등록</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 휴가 일수 종합 현황 카드 -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-2">
+                    <div class="flex justify-between items-center text-xs text-slate-400">
+                        <span>정기 연가 (총 21일 기준)</span>
+                        <i data-lucide="compass" class="w-4 h-4 text-blue-400"></i>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <span id="vacationAnnualRemaining" class="text-2xl font-bold text-white">21</span>
+                        <span class="text-xs text-slate-400">일 남음</span>
+                        <span class="text-xs text-slate-500">(사용: <span id="vacationAnnualUsed">0</span>일)</span>
+                    </div>
+                    <!-- 프로그레스 바 -->
+                    <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                        <div id="vacationProgressBar" class="bg-blue-500 h-full w-[0%] transition-all"></div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-2">
+                    <div class="flex justify-between items-center text-xs text-slate-400">
+                        <span>포상 / 위로 / 보상 휴가</span>
+                        <i data-lucide="award" class="w-4 h-4 text-amber-400"></i>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <span id="vacationRewardTotal" class="text-2xl font-bold text-amber-400">0</span>
+                        <span class="text-xs text-slate-400">일 획득/사용</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400">당직/사격/훈련 우수 포상 누적</p>
+                </div>
+
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-2">
+                    <div class="flex justify-between items-center text-xs text-slate-400">
+                        <span>다음 휴가 D-Day</span>
+                        <i data-lucide="clock" class="w-4 h-4 text-emerald-400"></i>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                        <span id="vacationDDayText" class="text-2xl font-bold text-emerald-400">D-??</span>
+                        <span id="vacationNextName" class="text-xs text-slate-400">예정 없음</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400">출발일 기준 카운트다운</p>
+                </div>
+            </div>
+
+            <!-- 휴가 내역 테이블 -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <h3 class="font-bold text-white text-base">휴가 사용 및 계획 목록</h3>
+                    <span id="vacationListCount" class="text-xs text-slate-400">0건</span>
+                </div>
+                <div id="vacationListContainer" class="space-y-2.5 max-h-[400px] overflow-y-auto pr-1">
+                    <!-- JS 렌더링 -->
+                </div>
+            </div>
+        </section>
+
+        <!-- ======================= TAB 6: 과제 제출 가이드 & Supabase 설정 ======================= -->
+        <section id="tab-guide" class="space-y-6 hidden">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+                <div class="flex items-center gap-3">
+                    <div class="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                        <i data-lucide="graduation-cap" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold text-white">기말고사 프로젝트 A+ 만점 제출 가이드</h2>
+                        <p class="text-xs text-slate-400">교수님께서 요구하신 GitHub + Supabase 연동 점수를 100% 획득하는 방법입니다.</p>
+                    </div>
+                </div>
+
+                <!-- 단계별 카드 -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                    <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+                        <span class="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                            <span class="w-5 h-5 rounded-full bg-emerald-500/20 border border-emerald-500 flex items-center justify-center text-[11px]">1</span>
+                            Supabase DB 세팅 (1분)
+                        </span>
+                        <p class="text-xs text-slate-300 leading-relaxed">
+                            프로젝트 내 <code>supabase-schema.sql</code> 파일 내용을 복사하여 Supabase SQL Editor에 붙여넣고 <strong>Run</strong>만 누르면 테이블과 RLS 보안 정책이 자동 생성됩니다.
+                        </p>
+                    </div>
+
+                    <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+                        <span class="text-xs font-bold text-blue-400 flex items-center gap-1.5">
+                            <span class="w-5 h-5 rounded-full bg-blue-500/20 border border-blue-500 flex items-center justify-center text-[11px]">2</span>
+                            URL & Key 연결
+                        </span>
+                        <p class="text-xs text-slate-300 leading-relaxed">
+                            우측 상단의 <strong>[로컬 모드/설정]</strong> 버튼을 눌러 Supabase의 Project URL과 anon key를 넣으면 즉시 클라우드 데이터베이스와 실시간 동기화됩니다.
+                        </p>
+                    </div>
+
+                    <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+                        <span class="text-xs font-bold text-purple-400 flex items-center gap-1.5">
+                            <span class="w-5 h-5 rounded-full bg-purple-500/20 border border-purple-500 flex items-center justify-center text-[11px]">3</span>
+                            GitHub Pages 배포
+                        </span>
+                        <p class="text-xs text-slate-300 leading-relaxed">
+                            GitHub 저장소에 이 파일들을 푸시한 뒤, <code>Settings -> Pages</code>에서 <code>main branch</code>를 선택하면 교수님이 모바일에서 테스트할 수 있는 무료 웹 링크가 완성됩니다.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- 강조 팁 -->
+                <div class="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-start gap-3">
+                    <i data-lucide="star" class="w-5 h-5 text-amber-400 shrink-0 mt-0.5"></i>
+                    <div class="text-xs text-slate-300 leading-relaxed">
+                        <strong class="text-amber-300">교수님께 어필할 핵심 엔지니어링 포인트:</strong>
+                        <ul class="list-disc list-inside mt-1 space-y-1 text-slate-400">
+                            <li>군사 기밀 및 개인 데이터 특성을 고려해 Supabase <strong>Row Level Security (RLS)</strong>를 적용함</li>
+                            <li>당직 근무 시 익일 비번 자동 생성 로직 및 반복 스케줄러 알고리즘 탑재</li>
+                            <li>Node.js 종속성 없이 브라우저 네이티브 기술과 CDN SDK만으로 가볍고 빠른 성능 달성</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ======================= MODALS ======================= -->
+
+    <!-- [모달 1] 새 일정 등록 모달 -->
+    <div id="scheduleModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl p-5 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="font-bold text-white text-base flex items-center gap-2">
+                    <i data-lucide="calendar-plus" class="w-5 h-5 text-emerald-400"></i>
+                    <span>새 군 일정 등록</span>
+                </h3>
+                <button onclick="closeScheduleModal()" class="text-slate-400 hover:text-white p-1">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <form id="scheduleForm" onsubmit="handleCreateSchedule(event)" class="space-y-3.5 text-xs">
+                <!-- 일정 카테고리 -->
+                <div>
+                    <label class="block text-slate-400 mb-1">일정 구분</label>
+                    <div class="grid grid-cols-4 gap-2">
+                        <label class="category-radio cursor-pointer">
+                            <input type="radio" name="catRadio" value="duty" class="hidden peer" onchange="toggleDutyOption(true)">
+                            <div class="p-2 rounded-xl bg-slate-800 border border-slate-700 text-center peer-checked:border-amber-500 peer-checked:bg-amber-500/10 peer-checked:text-amber-400 transition font-medium">
+                                당직/근무
+                            </div>
+                        </label>
+                        <label class="category-radio cursor-pointer">
+                            <input type="radio" name="catRadio" value="training" class="hidden peer" onchange="toggleDutyOption(false)" checked>
+                            <div class="p-2 rounded-xl bg-slate-800 border border-slate-700 text-center peer-checked:border-rose-500 peer-checked:bg-rose-500/10 peer-checked:text-rose-400 transition font-medium">
+                                훈련/교육
+                            </div>
+                        </label>
+                        <label class="category-radio cursor-pointer">
+                            <input type="radio" name="catRadio" value="routine" class="hidden peer" onchange="toggleDutyOption(false)">
+                            <div class="p-2 rounded-xl bg-slate-800 border border-slate-700 text-center peer-checked:border-purple-500 peer-checked:bg-purple-500/10 peer-checked:text-purple-400 transition font-medium">
+                                부대일과
+                            </div>
+                        </label>
+                        <label class="category-radio cursor-pointer">
+                            <input type="radio" name="catRadio" value="vacation" class="hidden peer" onchange="toggleDutyOption(false)">
+                            <div class="p-2 rounded-xl bg-slate-800 border border-slate-700 text-center peer-checked:border-blue-500 peer-checked:bg-blue-500/10 peer-checked:text-blue-400 transition font-medium">
+                                휴가
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 일정 제목 -->
+                <div>
+                    <label class="block text-slate-400 mb-1">일정명 *</label>
+                    <input id="schedTitle" type="text" required placeholder="예: 당직사관 근무, 혹한기 전술훈련, 전투체육" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 text-xs">
+                </div>
+
+                <!-- 당직 전용 옵션 (당직 선택 시 활성화) -->
+                <div id="dutyOptionBox" class="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-2 hidden">
+                    <div class="flex items-center justify-between">
+                        <span class="font-bold text-amber-300">당직 근무 옵션</span>
+                        <select id="schedDutyType" class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-[11px]">
+                            <option value="당직사관">당직사관</option>
+                            <option value="당직사령">당직사령</option>
+                            <option value="상황실근무">상황실</option>
+                            <option value="위병조장">위병조장</option>
+                        </select>
+                    </div>
+                    <label class="flex items-center gap-2 cursor-pointer pt-1">
+                        <input id="schedAutoOffDuty" type="checkbox" checked class="w-4 h-4 rounded text-emerald-600 focus:ring-0 bg-slate-800 border-slate-700">
+                        <span class="text-slate-300 font-medium">당직 익일 "비번" 일정 자동 등록 (권장)</span>
+                    </label>
+                </div>
+
+                <!-- 일시 선택 -->
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-slate-400 mb-1">시작일 *</label>
+                        <input id="schedStartDate" type="date" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">종료일 *</label>
+                        <input id="schedEndDate" type="date" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white focus:outline-none focus:border-emerald-500">
+                    </div>
+                </div>
+
+                <!-- 장소 및 세부내용 -->
+                <div>
+                    <label class="block text-slate-400 mb-1">장소 / 세부 메모</label>
+                    <input id="schedLocation" type="text" placeholder="예: 대대 본청, 영내 사격장, 대연병장" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 text-xs">
+                </div>
+
+                <!-- 훈련 준비물 템플릿 자동 연결 옵션 -->
+                <div id="gearOptionBox">
+                    <label class="block text-slate-400 mb-1">준비물 체크리스트 자동 추가</label>
+                    <select id="schedPresetGear" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500">
+                        <option value="none">추가 안 함</option>
+                        <option value="single">단독군장 세트 자동 추가</option>
+                        <option value="full">완전군장 세트 자동 추가</option>
+                        <option value="shooting">사격훈련 세트 자동 추가</option>
+                    </select>
+                </div>
+
+                <div class="pt-2 flex justify-end gap-2 border-t border-slate-800">
+                    <button type="button" onclick="closeScheduleModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-300 font-semibold">취소</button>
+                    <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-white font-bold shadow-lg shadow-emerald-950">등록</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- [모달 2] 점호 인원보고 양식 모달 -->
+    <div id="dutyReportModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl p-5 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="font-bold text-white text-base flex items-center gap-2">
+                    <i data-lucide="clipboard-check" class="w-5 h-5 text-amber-400"></i>
+                    <span>점호 및 일일 인원 보고 양식 생성기</span>
+                </h3>
+                <button onclick="closeDutyReportModal()" class="text-slate-400 hover:text-white p-1">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="space-y-3 text-xs">
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div>
+                        <label class="block text-slate-400 mb-1">총원</label>
+                        <input id="reportTotal" type="number" value="32" oninput="updateReportPreview()" class="w-full bg-slate-800 border border-slate-700 rounded px-2.5 py-1.5 text-white">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">현재원</label>
+                        <input id="reportPresent" type="number" value="28" oninput="updateReportPreview()" class="w-full bg-slate-800 border border-slate-700 rounded px-2.5 py-1.5 text-white">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">휴가</label>
+                        <input id="reportVacation" type="number" value="3" oninput="updateReportPreview()" class="w-full bg-slate-800 border border-slate-700 rounded px-2.5 py-1.5 text-white">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">환자/열외</label>
+                        <input id="reportSick" type="number" value="1" oninput="updateReportPreview()" class="w-full bg-slate-800 border border-slate-700 rounded px-2.5 py-1.5 text-white">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-slate-400 mb-1">열외자 세부 내용 (이름/사유)</label>
+                    <input id="reportDetails" type="text" value="상병 홍길동(외진), 일병 김철수(정기휴가)" oninput="updateReportPreview()" class="w-full bg-slate-800 border border-slate-700 rounded px-2.5 py-1.5 text-white">
+                </div>
+
+                <div>
+                    <label class="block text-slate-400 mb-1">생성된 보고 텍스트 (카톡/온나라 보고용)</label>
+                    <textarea id="reportPreviewArea" readonly rows="5" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-slate-200 font-mono text-xs select-all focus:outline-none"></textarea>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 border-t border-slate-800 pt-3">
+                <button onclick="closeDutyReportModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-300 font-semibold text-xs">닫기</button>
+                <button onclick="copyReportText()" class="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-lg shadow-amber-950">
+                    <i data-lucide="copy" class="w-4 h-4"></i>
+                    <span>클립보드에 복사</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- [모달 3] 휴가 등록 모달 -->
+    <div id="vacationModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-5 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="font-bold text-white text-base flex items-center gap-2">
+                    <i data-lucide="plane" class="w-5 h-5 text-blue-400"></i>
+                    <span>휴가 등록 & 잔여일수 차감</span>
+                </h3>
+                <button onclick="closeVacationModal()" class="text-slate-400 hover:text-white p-1">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <form id="vacationForm" onsubmit="handleCreateVacation(event)" class="space-y-3.5 text-xs">
+                <div>
+                    <label class="block text-slate-400 mb-1">휴가 종류</label>
+                    <select id="vacType" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white">
+                        <option value="연가">정기 연가</option>
+                        <option value="포상">포상 휴가</option>
+                        <option value="위로">위로 휴가</option>
+                        <option value="보상">보상 휴가</option>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-slate-400 mb-1">출발일</label>
+                        <input id="vacStartDate" type="date" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">복귀일</label>
+                        <input id="vacEndDate" type="date" required class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-slate-400 mb-1">차감 일수</label>
+                    <input id="vacDays" type="number" step="0.5" min="0.5" required value="3" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white">
+                </div>
+
+                <div>
+                    <label class="block text-slate-400 mb-1">행선지 / 사유</label>
+                    <input id="vacDest" type="text" placeholder="예: 본가(서울), 제주도 여행" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white">
+                </div>
+
+                <div class="pt-2 flex justify-end gap-2 border-t border-slate-800">
+                    <button type="button" onclick="closeVacationModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-300 font-semibold">취소</button>
+                    <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-white font-bold">등록</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- [모달 4] Supabase 연동 설정 모달 -->
+    <div id="configModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-5 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="font-bold text-white text-base flex items-center gap-2">
+                    <i data-lucide="database" class="w-5 h-5 text-emerald-400"></i>
+                    <span>Supabase 클라우드 DB 연동 설정</span>
+                </h3>
+                <button onclick="closeConfigModal()" class="text-slate-400 hover:text-white p-1">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="space-y-3 text-xs">
+                <p class="text-slate-400 leading-relaxed">
+                    Supabase 프로젝트의 <strong>Project Settings -> API</strong>에서 URL과 anon public key를 복사하여 아래에 입력하세요.
+                </p>
+
+                <div>
+                    <label class="block text-slate-300 mb-1 font-semibold">Supabase Project URL</label>
+                    <input id="cfgSupabaseUrl" type="text" placeholder="https://xxxxxxxx.supabase.co" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono text-xs focus:border-emerald-500 focus:outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-slate-300 mb-1 font-semibold">Supabase Anon Public Key</label>
+                    <input id="cfgSupabaseKey" type="password" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI..." class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white font-mono text-xs focus:border-emerald-500 focus:outline-none">
+                </div>
+
+                <div class="pt-2 flex justify-between items-center border-t border-slate-800">
+                    <button onclick="clearSupabaseConfig()" class="text-rose-400 hover:text-rose-300 text-xs">연동 해제 (로컬 모드로)</button>
+                    <button onclick="saveSupabaseConfig()" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs shadow-lg shadow-emerald-950">
+                        저장 및 연결
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 하단 푸터 -->
+    <footer class="bg-slate-900 border-t border-slate-800 py-4 px-4 text-center text-xs text-slate-500">
+        <p>오피서노트 (OfficerNote) &copy; 2026. 군 생활 통합 일정 관리 솔루션 (소위 임관 대비 기말고사 프로젝트)</p>
+    </footer>
+
+    <!-- 메인 자바스크립트 로직 로드 -->
+    <script src="app.js"></script>
+</body>
+</html>
+
